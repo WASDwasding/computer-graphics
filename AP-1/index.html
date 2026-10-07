@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AP1 · 交互式 2D 分形</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">计算机图形学 · Assigned Project 1</p>
+      <h1>交互式 2D 分形</h1>
+    </div>
+    <p class="topbar-note">WebGL 2.0 · Sierpinski 垫片</p>
+  </header>
+
+  <main>
+    <section class="panel" aria-label="参数面板">
+      <fieldset>
+        <legend>生成算法</legend>
+        <label class="select-field">
+          <span>方法</span>
+          <select id="algorithm">
+            <option value="chaos">混沌游戏</option>
+            <option value="recursive">递归细分</option>
+            <option value="tetra">四面体垫片（3D 预览）</option>
+          </select>
+        </label>
+        <p id="formula" class="formula"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>渲染模式</legend>
+        <div class="mode-row">
+          <label><input type="radio" name="mode" id="mode-points" value="points" checked> 点 <kbd>1</kbd></label>
+          <label><input type="radio" name="mode" id="mode-lines" value="lines"> 线框 <kbd>2</kbd></label>
+          <label><input type="radio" name="mode" id="mode-triangles" value="triangles"> 实体 <kbd>3</kbd></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>几何参数</legend>
+        <label class="slider-field" id="vertex-count-field">
+          <span>顶点数 <strong id="vertex-count-value">20000</strong></span>
+          <input id="vertex-count" type="range" min="5000" max="60000" step="1000" value="20000">
+        </label>
+        <label class="slider-field" id="depth-field">
+          <span>递归深度 <strong id="depth-value">5</strong></span>
+          <input id="depth" type="range" min="0" max="6" step="1" value="5">
+        </label>
+        <label class="slider-field" id="point-size-field">
+          <span>点大小 <strong id="point-size-value">2.5</strong></span>
+          <input id="point-size" type="range" min="1" max="8" step="0.5" value="2.5">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>n 边形混沌游戏</legend>
+        <label class="select-field" id="ngon-field">
+          <span>边数</span>
+          <select id="sides">
+            <option value="3">3 · 三角形垫片</option>
+            <option value="4">4 · 四边形</option>
+            <option value="5">5 · 五边形</option>
+            <option value="6">6 · 六边形</option>
+          </select>
+        </label>
+        <label class="slider-field" id="ratio-field">
+          <span>步长 r <strong id="ratio-value">0.500</strong></span>
+          <input id="ratio" type="range" min="0.35" max="0.75" step="0.001" value="0.5">
+        </label>
+        <label class="select-field" id="restriction-field">
+          <span>选点约束</span>
+          <select id="restriction">
+            <option value="none">任意顶点</option>
+            <option value="no-repeat">不重复上一顶点</option>
+            <option value="no-neighbor">不选相邻顶点</option>
+          </select>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>外观与动画</legend>
+        <label class="select-field">
+          <span>配色</span>
+          <select id="palette">
+            <option value="classic">经典</option>
+            <option value="warm">暖色</option>
+            <option value="neon">霓虹</option>
+          </select>
+        </label>
+        <label class="check-field">
+          <input id="growing" type="checkbox" checked>
+          <span>逐点生长 <kbd>空格</kbd></span>
+        </label>
+        <button id="reset-view" type="button">复位视图</button>
+      </fieldset>
+
+      <p id="status" class="status">正在准备几何数据…</p>
+    </section>
+
+    <section class="stage">
+      <canvas id="gl-canvas" tabindex="0" aria-label="分形画布"></canvas>
+      <p id="hint" class="hint">左键拖动平移 · 滚轮缩放 · 1 / 2 / 3 切换模式 · 空格暂停或继续逐点生长</p>
+    </section>
+  </main>
+
+  <script id="vertex-shader" type="x-shader/x-vertex">#version 300 es
+in vec3 aPosition;
+in vec3 aColor;
+in vec3 aNormal;
+
+uniform mat4 uMVP;
+uniform mat4 uModel;
+uniform float uPointSize;
+uniform float uLighting;
+
+out vec3 vColor;
+
+void main() {
+    gl_Position = uMVP * vec4(aPosition, 1.0);
+    gl_PointSize = uPointSize;
+    if (uLighting > 0.5) {
+        vec3 n = normalize(mat3(uModel) * aNormal);
+        vec3 lightDir = normalize(vec3(0.35, 0.8, 0.5));
+        float lambert = abs(dot(n, lightDir));
+        vColor = aColor * (0.32 + 0.68 * lambert);
+    } else {
+        vColor = aColor;
+    }
+}
+</script>
+
+  <script id="fragment-shader" type="x-shader/x-fragment">#version 300 es
+precision mediump float;
+
+in vec3 vColor;
+uniform float uRoundPoints;
+out vec4 fColor;
+
+void main() {
+    if (uRoundPoints > 0.5) {
+        vec2 p = gl_PointCoord * 2.0 - 1.0;
+        if (dot(p, p) > 1.0) discard;
+    }
+    fColor = vec4(vColor, 1.0);
+}
+</script>
+
+  <script src="Common/webgl-utils.js"></script>
+  <script src="Common/MV.js"></script>
+  <script src="Common/initShaders.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

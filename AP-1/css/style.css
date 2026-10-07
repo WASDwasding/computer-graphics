@@ -1,0 +1,210 @@
+:root {
+  --ink: #1c1915;
+  --muted: #6d655c;
+  --line: #ddd4c6;
+  --paper: #f3eee4;
+  --panel: #faf7f1;
+  --accent: #b8432f;
+  --stage: #121417;
+  color: var(--ink);
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Songti SC", "Noto Serif SC", serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--paper);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 16px 22px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.eyebrow {
+  margin: 0 0 2px;
+  color: var(--accent);
+  font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.topbar-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.panel {
+  width: 340px;
+  flex: none;
+  overflow: auto;
+  padding: 8px 18px 20px;
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+}
+
+fieldset {
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+legend {
+  padding: 0;
+  font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.formula {
+  margin: 10px 0 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 8px;
+}
+
+.mode-row label,
+.check-field,
+.select-field,
+.slider-field {
+  font-family: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
+  font-size: 14px;
+}
+
+.mode-row label,
+.check-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.select-field,
+.slider-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.select-field span,
+.slider-field span {
+  display: flex;
+  justify-content: space-between;
+}
+
+select, button, input[type="range"] {
+  accent-color: var(--accent);
+}
+
+select, button {
+  font: inherit;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #d9d0c3;
+  border-radius: 6px;
+  padding: 7px 8px;
+}
+
+button {
+  width: 100%;
+  margin-top: 12px;
+  cursor: pointer;
+  background: var(--ink);
+  color: #f6f1e8;
+  border-color: var(--ink);
+}
+
+button:hover { background: #3a332c; }
+
+kbd {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  padding: 1px 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.is-disabled {
+  opacity: 0.45;
+}
+
+.status {
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: var(--stage);
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  cursor: grab;
+}
+
+canvas:active { cursor: grabbing; }
+
+.hint {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-family: "Avenir Next", "PingFang SC", "Noto Sans SC", sans-serif;
+  font-size: 13px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+@media (max-width: 800px) {
+  main { flex-direction: column; }
+  .panel { width: auto; max-height: 42vh; }
+  .stage { min-height: 58vh; }
+}
