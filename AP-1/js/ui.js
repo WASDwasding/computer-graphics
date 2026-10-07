@@ -82,11 +82,12 @@ export function bindUI(state, hooks) {
    * 三角形垫片的步长和选点规则是固定的，所以边数为 3 时那两项灰掉。
    */
   function sync() {
-    algorithm.value = state.algorithm;
+    algorithm.value = state.algorithm; // 下拉框显示当前算法
     for (const name of PRIMITIVES) {
+      // 三个单选框里，只有和 state.primitive 同名的那个打勾。键盘切换后也靠这行把勾选补上。
       document.getElementById(`mode-${name}`).checked = state.primitive === name;
     }
-    vertexCount.value = String(state.vertexCount);
+    vertexCount.value = String(state.vertexCount); // 滑条的 value 必须是字符串
     depth.value = String(state.depth);
     pointSize.value = String(state.pointSize);
     sides.value = String(state.sides);
@@ -95,19 +96,21 @@ export function bindUI(state, hooks) {
     palette.value = state.palette;
     growing.checked = state.growing;
 
+    // 滑条旁边的数字。点大小和步长保留小数，顶点数和深度是整数。
     writeReadout("vertex-count-value", String(state.vertexCount));
     writeReadout("depth-value", String(state.depth));
     writeReadout("point-size-value", state.pointSize.toFixed(1));
     writeReadout("ratio-value", state.ratio.toFixed(3));
 
     const chaosPoints = state.algorithm === "chaos";
-    vertexCount.disabled = !chaosPoints;
+    vertexCount.disabled = !chaosPoints; // 不是混沌游戏时，顶点数滑条不能拖
     document.getElementById("vertex-count-field").classList.toggle("is-disabled", !chaosPoints);
 
-    const usesDepth = state.algorithm !== "chaos";
+    const usesDepth = state.algorithm !== "chaos"; // 递归细分和四面体才用深度
     depth.disabled = !usesDepth;
     document.getElementById("depth-field").classList.toggle("is-disabled", !usesDepth);
 
+    // 边数、步长、选点约束只在“混沌游戏且不是三角形”时能改。三角形的公式是作业规定的。
     const ngon = chaosPoints && state.sides !== 3;
     sides.disabled = !chaosPoints;
     ratio.disabled = !ngon;
@@ -133,14 +136,15 @@ export function bindUI(state, hooks) {
 
   // 切回混沌游戏时强制成点模式，因为随机点没有线框和实体。
   algorithm.addEventListener("change", () => {
-    state.algorithm = algorithm.value;
-    if (state.algorithm === "chaos") state.primitive = "points";
-    hooks.onGeometry();
-    sync();
+    state.algorithm = algorithm.value; // "chaos"、"recursive" 或 "tetra"
+    if (state.algorithm === "chaos") state.primitive = "points"; // 随机点没有线和面
+    hooks.onGeometry(); // 通知 main.js 按新算法重算顶点
+    sync(); // 灰掉现在用不到的滑条
   });
 
   for (const name of PRIMITIVES) {
     document.getElementById(`mode-${name}`).addEventListener("change", () => {
+      // 一组单选框切换时，被取消的那个也会触发 change。只处理新被选中的那个。
       if (!document.getElementById(`mode-${name}`).checked) return;
       hooks.setPrimitive(name);
     });
@@ -148,9 +152,9 @@ export function bindUI(state, hooks) {
 
   // input 在拖动过程中就触发，所以点数和深度会跟着滑条实时重算。
   vertexCount.addEventListener("input", () => {
-    state.vertexCount = Number(vertexCount.value);
+    state.vertexCount = Number(vertexCount.value); // 滑条给的是字符串，转成数字再交给几何
     writeReadout("vertex-count-value", String(state.vertexCount));
-    hooks.onGeometry();
+    hooks.onGeometry(); // 点数变了，混沌游戏要整批重算
   });
 
   depth.addEventListener("input", () => {
@@ -163,12 +167,13 @@ export function bindUI(state, hooks) {
   pointSize.addEventListener("input", () => {
     state.pointSize = Number(pointSize.value);
     writeReadout("point-size-value", state.pointSize.toFixed(1));
+    // 这里不调用 onGeometry。点大小下一帧作为 uniform 传给着色器，顶点数组不用重算。
   });
 
   sides.addEventListener("change", () => {
     state.sides = Number(sides.value);
-    hooks.onSides();
-    sync();
+    hooks.onSides(); // main.js 会套上这个边数的推荐步长和选点规则，再重算
+    sync(); // 边数变成 3 时要把步长滑条灰掉
   });
 
   ratio.addEventListener("input", () => {
@@ -184,7 +189,7 @@ export function bindUI(state, hooks) {
 
   palette.addEventListener("change", () => {
     state.palette = palette.value;
-    hooks.onPalette();
+    hooks.onPalette(); // 只重写颜色缓冲，不重跑混沌游戏，点的位置保持不变
   });
 
   growing.addEventListener("change", () => {
@@ -195,12 +200,12 @@ export function bindUI(state, hooks) {
     hooks.onResetView();
   });
 
-  sync();
+  sync(); // 第一次打开页面时，按默认 state 把该灰的控件灰掉
 
   return {
-    sync,
+    sync, // 键盘改了模式后，main.js 用它把单选框和说明文字刷成一致
     setStatus(text) {
-      status.textContent = text;
+      status.textContent = text; // 面板底部那一行“生长中 · 1234 / 20000”
     },
   };
 }
