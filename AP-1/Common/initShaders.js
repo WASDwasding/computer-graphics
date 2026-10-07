@@ -1,4 +1,13 @@
 //
+// 文件：Common/initShaders.js
+//
+// 教材配套工具，不是这次作业自己写的算法。
+// initShaders(gl, 顶点着色器id, 片元着色器id) 做三件事：
+//   1. 用 document.getElementById 取出 index.html 里的着色器文本
+//   2. 分别编译顶点着色器和片元着色器
+//   3. 链成一个 program 交还给 main.js
+// 编译或链接失败时会 alert 错误日志。
+//
 //  initShaders.js
 //
 

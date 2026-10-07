@@ -1,4 +1,16 @@
 <!DOCTYPE html>
+<!--
+  文件：index.html
+
+  这是 AP1 的页面入口，浏览器打开的就是它。它自己不算分形，只把零件拼到一页上：
+    左侧参数面板     控件，逻辑在 js/ui.js
+    canvas           画布，真正绘制在 js/main.js
+    两段 script      顶点着色器和片元着色器，initShaders 按 id 读它们
+    Common/          教材工具库：创建上下文、向量矩阵、编译着色器
+    js/main.js       模块入口，再去调用 geometry / interaction / ui
+
+  脚本顺序不能倒。Common 必须先于 main.js，因为模块要使用它们的全局函数。
+-->
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -106,24 +118,37 @@
     </section>
   </main>
 
+  <!--
+    着色器写在 script 标签里，type 不是 JavaScript，浏览器不会执行。
+    initShaders 用这两个 id 把文本取出来编译。
+    #version 300 es 必须是第一行，这是 WebGL 2 的着色器版本。
+    WebGL 2 用 in / out，不再用旧的 attribute / varying。
+  -->
   <script id="vertex-shader" type="x-shader/x-vertex">#version 300 es
+// 每个顶点一份：坐标、颜色、法线。由 main.js 的 VBO 提供。
 in vec3 aPosition;
 in vec3 aColor;
 in vec3 aNormal;
 
+// 整幅图共用。uMVP 把模型坐标变到裁剪坐标；uModel 只含旋转，用来转法线。
 uniform mat4 uMVP;
 uniform mat4 uModel;
 uniform float uPointSize;
 uniform float uLighting;
 
+// 传给片元着色器。光栅化时会在顶点之间插值。
 out vec3 vColor;
 
 void main() {
+    // gl_Position 是裁剪坐标，xy 在 [-1, 1] 里才会出现在画面上。
     gl_Position = uMVP * vec4(aPosition, 1.0);
+    // 点的大小用像素计。三角形和线段会忽略它。
     gl_PointSize = uPointSize;
     if (uLighting > 0.5) {
+        // mat3(uModel) 取旋转部分。法线跟着模型转，光照方向留在相机一侧。
         vec3 n = normalize(mat3(uModel) * aNormal);
         vec3 lightDir = normalize(vec3(0.35, 0.8, 0.5));
+        // abs 让正反面都亮。垫片有朝内的洞，单面光照会有一整片是黑的。
         float lambert = abs(dot(n, lightDir));
         vColor = aColor * (0.32 + 0.68 * lambert);
     } else {
@@ -140,6 +165,8 @@ uniform float uRoundPoints;
 out vec4 fColor;
 
 void main() {
+    // gl_PointCoord 是当前片元在点精灵里的位置，范围 0 到 1。
+    // 离点中心超过半径就丢掉，方点就变成圆点。画三角形时这个开关是关的。
     if (uRoundPoints > 0.5) {
         vec2 p = gl_PointCoord * 2.0 - 1.0;
         if (dot(p, p) > 1.0) discard;
@@ -148,6 +175,7 @@ void main() {
 }
 </script>
 
+  <!-- 先加载教材工具，再加载模块。模块里直接使用它们的全局函数。 -->
   <script src="Common/webgl-utils.js"></script>
   <script src="Common/MV.js"></script>
   <script src="Common/initShaders.js"></script>

@@ -1,9 +1,27 @@
 /**
- * 几何生成：不接触 WebGL。
- * 混沌游戏与递归细分各自产出同一份顶点布局，渲染模式只决定怎么画。
+ * 文件：js/geometry.js
+ *
+ * 这个文件只负责算图形，完全不碰 WebGL，也不读鼠标。
+ * main.js 把面板上的算法、点数、深度传进来，这里返回三份数组：
+ *   positions   每个顶点的 xyz
+ *   colorIndex  这个顶点属于第几个角，用来上色
+ *   normals     法线，只有三维实体光照才用
+ *
+ * 里面有两条必做路径，外加一个选做：
+ *   chaosGame            混沌游戏。反复执行 p ← (p + 随机顶点) / 2
+ *   subdivideTriangle    递归细分。三边取中点，丢掉中间的三角形
+ *   subdivideTetrahedron 选做。同样的想法用在四面体上，丢掉中间的八面体
+ *
+ * 老师问“顶点从哪来”：先在这个文件里用 Float32Array 算好，
+ * 再由 main.js 的 gl.bufferData 拷进显卡。
  */
 
-/** 正 n 边形顶点，外接圆半径 radius，几何中心在原点，y 轴向上。 */
+/**
+ * 正 n 边形的顶点。
+ * 圆心在原点，第一个顶点在正上方（角度从 90° 起），然后逆时针转。
+ * 半径 0.86 是为了放进裁剪空间 [-1, 1]，四周留一点边。
+ * 三角形的三个顶点重心也在原点，所以垫片画出来是居中的。
+ */
 export function regularPolygon(n, radius = 0.86) {
   const vertices = [];
   for (let i = 0; i < n; i += 1) {
@@ -14,9 +32,13 @@ export function regularPolygon(n, radius = 0.86) {
 }
 
 /**
- * 各边形混沌游戏的推荐参数。
- * ratio 是朝选中顶点移动的比例：p ← (1-ratio)*p + ratio*v。
- * 三角形 ratio = 1/2 就是题目中的 p = (p + v) / 2。
+ * 换边数时用的默认参数。
+ * ratio 是“朝选中顶点走完全程的百分之多少”。
+ * 公式统一写成 p ← (1 - ratio) * p + ratio * 顶点。
+ * 三角形 ratio = 0.5，化简后就是作业要求的 p = (p + 顶点) / 2。
+ *
+ * restriction 是选点限制。边数大于 3 时如果每次都任意选，
+ * 点会把多边形内部填满，看不出分形，所以要加限制。
  */
 export const NGON_PRESETS = {
   3: { ratio: 0.5, restriction: "none" },
@@ -25,6 +47,7 @@ export const NGON_PRESETS = {
   6: { ratio: 2 / 3, restriction: "no-neighbor" },
 };
 
+/** 线段中点。递归细分时，每条边都取这个点再连起来。 */
 function midpoint(a, b) {
   return [
     (a[0] + b[0]) / 2,
@@ -37,6 +60,7 @@ function sub(a, b) {
   return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 }
 
+/** 叉积。两个边向量叉乘得到三角形的法线方向。 */
 function cross(a, b) {
   return [
     a[1] * b[2] - a[2] * b[1],
@@ -49,12 +73,18 @@ function dot(a, b) {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
+/** 变成单位向量。长度接近 0 时用 1，避免除以 0。 */
 function normalize(v) {
   const len = Math.hypot(v[0], v[1], v[2]) || 1;
   return [v[0] / len, v[1] / len, v[2] / len];
 }
 
-/** 朝原点外侧的单位法线，四面体以原点为中心时用于区分正反面。 */
+/**
+ * 三角形的单位法线，并翻到朝外。
+ * 四面体以原点为中心，面的中心大致指向外侧。
+ * 若法线和“原点到面心”的点积是负的，说明法线朝里，取反。
+ * 二维垫片不开光照，这个法线只是占位；三维实体才会用它算明暗。
+ */
 function outwardNormal(a, b, c) {
   let n = cross(sub(b, a), sub(c, a));
   const center = [
@@ -66,6 +96,13 @@ function outwardNormal(a, b, c) {
   return normalize(n);
 }
 
+/**
+ * 这一步选多边形的哪个顶点。
+ * none：0 到 n-1 里均匀随机，三角形垫片用这个。
+ * no-repeat：不能选和上一次相同的顶点。从 n-1 个候选里抽，
+ *   抽到的编号如果落在“上一次”之后，就加 1，从而跳过 last。
+ * no-neighbor：不能选左右相邻的两个顶点，六边形用这个才不会糊成一片。
+ */
 function pickVertex(n, last, restriction, rand) {
   if (restriction === "none" || last < 0) {
     return Math.floor(rand() * n);
@@ -85,9 +122,18 @@ function pickVertex(n, last, restriction, rand) {
 
 /**
  * 混沌游戏。
- * 从多边形内部一点出发，反复朝随机顶点走一步。
- * 三角形且 ratio 为 0.5 时，吸引子是 Sierpinski 垫片。
- * 丢弃前若干步，避免起点附近的过渡点。
+ *
+ * 起点取多边形顶点的平均值，也就是中心，保证一开始就在图形内部。
+ * 然后循环 count + 24 次：
+ *   1. 按规则随机选一个顶点
+ *   2. 当前点朝那个顶点走 ratio 这么一段
+ *   3. 前 24 次不记录。起点附近的点还没落到吸引子上，画出来会脏
+ * 三角形且 ratio 为 0.5 时，落点就是 Sierpinski 垫片。
+ *
+ * 返回三份等长数据，第 k 个点占三个连续浮点数（x, y, z）：
+ *   positions  坐标，z 一律是 0，因为这是平面图形
+ *   colorIndex 这次选中的顶点编号，换配色时不用重算坐标
+ *   normals    平面法线 (0, 0, 1)，二维不用光照
  */
 export function chaosGame({
   vertices,
@@ -115,6 +161,7 @@ export function chaosGame({
   for (let i = 0; i < count + warmup; i += 1) {
     const index = pickVertex(n, last, restriction, rand);
     const vertex = vertices[index];
+    // (1-r)*p + r*v。r = 1/2 时就是 (p + v) / 2。
     px = (1 - ratio) * px + ratio * vertex[0];
     py = (1 - ratio) * py + ratio * vertex[1];
     last = index;
@@ -131,10 +178,20 @@ export function chaosGame({
 }
 
 /**
- * 递归细分一个三角形。
- * depth = 0 时保留该三角形；否则连接三边中点，
- * 只对三个角上的子三角形继续递归，中间那块挖空。
- * 返回的每个小三角形带一个 colorId，对应它属于最初的哪一个角。
+ * 递归细分一个三角形，得到垫片。
+ *
+ * subdivide(a, b, c, level)：
+ *   level 为 0：这个三角形留下来，不再挖。
+ *   否则取三边中点 ab、bc、ca。原来的三角形被分成四块：
+ *     角 a 的小三角形 (a, ab, ca)
+ *     角 b 的小三角形 (ab, b, bc)
+ *     角 c 的小三角形 (ca, bc, c)
+ *     中间那块 (ab, bc, ca) 不递归，等于挖空，这就是垫片的洞。
+ * 深度 d 最后有 3^d 个小三角形。深度 5 是 243 个，深度 6 是 729 个。
+ *
+ * colorId 记住这个小三角形属于最初的哪一个角。
+ * 只在最外层那一次递归时分配 0、1、2，更深层把这个编号传下去，
+ * 所以三个大角会各是一种颜色。
  */
 export function subdivideTriangle(vertices, depth) {
   const triangles = [];
@@ -164,7 +221,10 @@ export function subdivideTriangle(vertices, depth) {
   return triangles;
 }
 
-/** 教材中的正四面体四个顶点，已落在以原点为中心的球面上。 */
+/**
+ * 正四面体的四个顶点，来自教材里的 gasket 例子，已经以原点为中心。
+ * 一个在后下方，三个在前面围成一圈。
+ */
 const TETRA_VERTICES = [
   [0, 0, -1],
   [0, 0.942809041582, 0.333333333333],
@@ -173,8 +233,14 @@ const TETRA_VERTICES = [
 ];
 
 /**
- * 三维垫片：每次把四面体分成四个角上的小四面体，去掉中间的八面体。
- * 深度 0 输出四个外表面。
+ * 三维垫片，思想和二维一样，只是“挖掉中间”的形状不同。
+ *
+ * 四面体有 4 个顶点和 6 条棱。每条棱取中点后，四个角上各剩一个小四面体，
+ * 中间是一个八面体。只递归四个角，八面体丢掉，洞就出来了。
+ * 深度 d 有 4^(d+1) 个三角形面。深度 0 就是原来的 4 个面。
+ *
+ * 到了最细一层，每个小四面体输出 4 个三角面。
+ * colorId 同样只在最外层分成 0、1、2、3，对应四个角。
  */
 export function subdivideTetrahedron(depth) {
   const faces = [];
@@ -207,6 +273,10 @@ export function subdivideTetrahedron(depth) {
   return faces;
 }
 
+/**
+ * 把一个顶点写进三份平行数组，并让游标加 1。
+ * 位置、法线都是每顶点 3 个 float，所以下标是 cursor * 3。
+ */
 function pushVertex(positions, normals, colorIndex, cursor, point, normal, colorId) {
   positions[cursor * 3] = point[0];
   positions[cursor * 3 + 1] = point[1];
@@ -218,7 +288,14 @@ function pushVertex(positions, normals, colorIndex, cursor, point, normal, color
   return cursor + 1;
 }
 
-/** 把三角形列表展开成点/线/面共用的顶点数组。线和面的顶点顺序不同。 */
+/**
+ * 把“三角形列表”摊成显卡能直接画的顶点序列。
+ *
+ * gl.TRIANGLES：每个三角形 3 个顶点，按顺序画成一个填充三角形。
+ * gl.POINTS：顶点数和三角形模式一样，只是绘制时改用点图元，所以点和实体共用这份数据。
+ * gl.LINES：线段必须成对。一条边要两个顶点，三条边就是 6 个顶点：
+ *   a-b、b-c、c-a。不能只给 3 个点，否则 LINES 不知道谁和谁连。
+ */
 function expandFaces(faces, primitive) {
   const perFace = primitive === "lines" ? 6 : 3;
   const count = faces.length * perFace;
@@ -247,8 +324,9 @@ function expandFaces(faces, primitive) {
 }
 
 /**
- * 按当前参数生成一份网格。
- * 混沌游戏忽略 primitive（它只有点）；递归与四面体按点/线/面展开同一组三角形。
+ * 按当前面板参数挑一种算法，返回可以上传的网格。
+ * 混沌游戏没有边和面，primitive 被忽略。
+ * 三角形垫片固定用推荐的 ratio 和“任意顶点”，避免滑条把必做图形改坏。
  */
 export function buildMesh(params) {
   if (params.algorithm === "chaos") {
@@ -273,6 +351,10 @@ export function buildMesh(params) {
   return expandFaces(subdivideTriangle(corners, params.depth), params.primitive);
 }
 
+/**
+ * 把“顶点属于第几个角”换成真正的 RGB。
+ * 配色只改颜色缓冲，不重新跑混沌游戏，所以换颜色时点的位置不变。
+ */
 export function paint(colorIndex, palette) {
   const colors = new Float32Array(colorIndex.length * 3);
   for (let i = 0; i < colorIndex.length; i += 1) {

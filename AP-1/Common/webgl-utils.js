@@ -1,4 +1,14 @@
 /*
+ * 文件：Common/webgl-utils.js
+ *
+ * 教材配套工具，下面的许可证是原文件的。这次只改了一处：
+ * 创建上下文时优先尝试 "webgl2"，因为课程要求 WebGL 2.0，
+ * 原名单里只有 WebGL 1 的名字。
+ *
+ * main.js 用它做两件事：
+ *   WebGLUtils.setupWebGL(canvas)  创建绘图上下文，失败时在页面上给出说明
+ *   requestAnimFrame               请求浏览器下一帧再调用绘制函数
+ *
  * Copyright 2010, Google Inc.
  * All rights reserved.
  *

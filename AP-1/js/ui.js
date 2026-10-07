@@ -1,7 +1,18 @@
 /**
- * 参数面板。控件写在 index.html 里，这里负责读写和禁用逻辑。
+ * 文件：js/ui.js
+ *
+ * 这个文件负责左侧参数面板。按钮和滑条的 HTML 在 index.html，
+ * 这里负责：读控件、写进 state、把当前用不到的滑条灰掉。
+ *
+ * 顶点数只在混沌游戏里生效，递归深度只在细分和四面体里生效。
+ * 换配色不重算顶点，只通知 main.js 重写颜色缓冲。
+ * 键盘改了模式之后，main.js 会调用这里返回的 sync()，让单选按钮跟上。
  */
 
+/**
+ * 三套配色。colors[i] 是第 i 个角的 RGB，范围 0 到 1，直接送进着色器。
+ * background 是清屏颜色。换配色不改几何，只重写颜色缓冲。
+ */
 export const PALETTES = {
   classic: {
     label: "经典",
@@ -65,6 +76,11 @@ export function bindUI(state, hooks) {
     if (node) node.textContent = text;
   }
 
+  /**
+   * 把 state 写回控件，并按当前算法禁用用不上的滑条。
+   * 顶点数只对混沌游戏有意义；递归深度只对细分和四面体有意义。
+   * 三角形垫片的步长和选点规则是固定的，所以边数为 3 时那两项灰掉。
+   */
   function sync() {
     algorithm.value = state.algorithm;
     for (const name of PRIMITIVES) {
@@ -115,6 +131,7 @@ export function bindUI(state, hooks) {
     }
   }
 
+  // 切回混沌游戏时强制成点模式，因为随机点没有线框和实体。
   algorithm.addEventListener("change", () => {
     state.algorithm = algorithm.value;
     if (state.algorithm === "chaos") state.primitive = "points";
@@ -129,6 +146,7 @@ export function bindUI(state, hooks) {
     });
   }
 
+  // input 在拖动过程中就触发，所以点数和深度会跟着滑条实时重算。
   vertexCount.addEventListener("input", () => {
     state.vertexCount = Number(vertexCount.value);
     writeReadout("vertex-count-value", String(state.vertexCount));
@@ -141,6 +159,7 @@ export function bindUI(state, hooks) {
     hooks.onGeometry();
   });
 
+  // 点大小只是一个 uniform，不用重新生成顶点。
   pointSize.addEventListener("input", () => {
     state.pointSize = Number(pointSize.value);
     writeReadout("point-size-value", state.pointSize.toFixed(1));
