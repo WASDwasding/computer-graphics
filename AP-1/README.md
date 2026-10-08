@@ -86,4 +86,10 @@ p ← (p + 随机顶点) / 2
 
 - `Common/MV.js`、`Common/initShaders.js` 来自 Edward Angel、Dave Shreiner，*Interactive Computer Graphics* 配套代码：<https://www.interactivecomputergraphics.com/Code/Common/>
 - `Common/webgl-utils.js` 来自教材配套的 WebGL 工具（Google，BSD 风格许可）。原文件只探测 WebGL 1 的上下文名，这里把 `webgl2` 加到探测列表最前面，以符合课程的 WebGL 2.0 要求。
-- 垫片算法对应教材第 2–3 章的 Sierpinski gasket。页面上的生成、交互和界面代码为本作业独立编写。
+- 垫片算法对应教材第 2–3 章的 Sierpinski gasket。
+
+## AI 工具
+
+本目录中的页面结构、`js/` 下的几何与交互代码、着色器、样式、中文注释和本 README，使用 Cursor 中的 Grok 4.7 生成，并在本地运行检查后提交。
+
+`Common/MV.js`、`Common/initShaders.js`、`Common/webgl-utils.js` 来自教材配套代码，不是 AI 生成的。`webgl-utils.js` 里为了优先创建 WebGL 2 上下文，增加了 `webgl2` 这一项探测。
